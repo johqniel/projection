@@ -16,7 +16,7 @@ except ImportError:
 # --- CONFIGURATION ---
 MODEL_PATH = "detect.tflite" 
 LABEL_PATH = "labelmap.txt"
-CAMERA_INDEX = 0  # Note: On Mac, 0 is usually the Webcam. 1 is usually the USB Capture Card.
+CAMERA_INDEX = 1  # Note: On Mac, 0 is usually the Webcam. 1 is usually the USB Capture Card.
 THRESHOLD = 0.5       
 PERSON_CLASS_ID = 0   
 
