@@ -1,3 +1,4 @@
 vm/
-detect.tflite
+recordings/
+samples/
 labelmap.txt
