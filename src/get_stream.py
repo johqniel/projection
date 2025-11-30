@@ -2,6 +2,8 @@
 import yt_dlp 
 import cv2
 
+from config import FULL_H, FULL_W, CROP_H, CROP_W
+
 
 # --- GENERATORS (STREAMS) ---
 
@@ -37,22 +39,4 @@ def get_raw_stream_generator(source_path, loop=True):
         yield frame
     
     cap.release()
-
-def crop_generator(input_stream):
-    """
-    Consumes a stream, crops it, and yields cropped frames.
-    """
-    # Define Crop Coordinates (Zone 1)
-    # Logic: Right half of the image
-    A_H, B_H = 0, CROP_H
-    A_V, B_V = int(FULL_W - 1.5*CROP_H), FULL_W
-
-    for frame in input_stream:
-        # Resize to standard if needed
-        frame = cv2.resize(frame, (FULL_W, FULL_H))
-        
-        # Crop
-        cropped = frame[A_H:B_H, A_V:B_V]
-        
-        yield cropped
 

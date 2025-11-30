@@ -1,4 +1,10 @@
 vm/
 recordings/
 samples/
+model/
 labelmap.txt
+
+*.npy
+*.tflite
+*.pt
+*.onnx
