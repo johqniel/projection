@@ -15,7 +15,8 @@ except ImportError:
 MODEL_PATH = "detect.tflite" 
 THRESHOLD = 0.3 # Reduced threshold for better detection
 YOUTUBE_URL = "https://www.youtube.com/watch?v=6dp-bvQ7RWo" 
-VIDEO_PATH = "/Users/nielo/Desktop/projection/samples/A.MOV"
+#VIDEO_PATH = "/Users/nielo/Desktop/projection/samples/A.MOV"
+VIDEO_PATH = ""
 
 PERSON_CLASS_ID = 0
 TRAFFIC_LIGHT_CLASS_ID = 9 
