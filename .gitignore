@@ -1,12 +1,9 @@
-vm/
-recordings/
-samples/
-models/
+# ignore everything: 
 
-.DS_Store
-labelmap.txt
+*
 
-*.npy
-*.tflite
-*.pt
-*.onnx
+#But these: 
+
+!.gitignore
+!src/
+!src/** 
