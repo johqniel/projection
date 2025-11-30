@@ -2,6 +2,8 @@ vm/
 recordings/
 samples/
 models/
+
+.DS_Store
 labelmap.txt
 
 *.npy
