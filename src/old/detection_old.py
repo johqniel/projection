@@ -280,6 +280,8 @@ def draw_background_border(frame, w, h, start_pos, end_pos):
     # Apply the transparency
     cv2.addWeighted(overlay, BG_ALPHA, frame, 1 - BG_ALPHA, 0, frame)
 
+
+
 def main():
     # Check if model file exists before starting
     if not os.path.exists(MODEL_PATH):

@@ -123,6 +123,7 @@ def get_stream_url(yt_url):
 # ---------------------------------------------------------
 
 def mouse_callback(event, x, y, flags, param):
+
     global roi_start, roi_end, roi_selected, manual_roi_coords
     
     # 1. User presses mouse button down
