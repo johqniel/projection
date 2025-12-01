@@ -46,4 +46,4 @@ def main_url():
     run_surveillance(raw_stream, tl_config)
 
 if __name__ == "__main__":
-    main_url()
+    main_sample()

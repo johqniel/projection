@@ -8,7 +8,7 @@ import sys
 # --- HELPER: SETUP SESSION (MOUSE LOGIC) ---
 class SetupSession:
     def __init__(self):
-        self.step = 0 # 0=Zoom, 1=Red Light, 2=Shape
+        self.step = 0 # 0=Zoom, 1=Red Light, 2=Shape, 3=Street
         self.pt_start = None # Startpunkt (Mausklick)
         self.pt_end = None   # Endpunkt (Mausbewegung)
         self.current_pos = (0,0) # Aktuelle Mausposition
@@ -19,6 +19,7 @@ class SetupSession:
         self.zoom_rect_screen = None 
         self.red_rect_screen = None
         self.shape_points_screen = []
+        self.street_points_screen = []
         
         self.finished = False
 
@@ -56,6 +57,13 @@ class SetupSession:
                     self.shape_points_screen.append((x, y))
                     print(f"Point added: {(x, y)}")
 
+        # STEP 4: STREET DEFINITION (4 POINTS)
+        elif self.step == 3:
+            if event == cv2.EVENT_LBUTTONDOWN:
+                if len(self.street_points_screen) < 4:
+                    self.street_points_screen.append((x, y))
+                    print(f"Street Point added: {(x, y)}")
+
 
 
 
@@ -71,6 +79,7 @@ def define_traffic_light(stream):
     final_zoom_rect = None 
     final_red_rect = None
     final_shape = []
+    final_street = []
     
     # Safe Stream Iteration (Handles End-of-Stream for YouTube/Files)
     stream_iter = iter(stream)
@@ -151,6 +160,19 @@ def define_traffic_light(stream):
                     if i > 0: cv2.line(display_frame, pts[i-1], pt, (255, 0, 0), 2)
                 if len(pts) == 4: cv2.line(display_frame, pts[0], pts[3], (255, 0, 0), 2)
 
+        # STEP 4: STREET DEFINITION (NATIVE VIEW)
+        elif session.step == 3:
+             # Zeige natives Bild (ohne Resize/Upscale)
+            display_frame = frame.copy()
+            
+            cv2.putText(display_frame, "4. KLICKE 4 PUNKTE FUER STRASSE (ENTER)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            
+            pts = session.street_points_screen
+            for i, pt in enumerate(pts):
+                cv2.circle(display_frame, pt, 5, (0, 0, 255), -1)
+                if i > 0: cv2.line(display_frame, pts[i-1], pt, (0, 0, 255), 2)
+            if len(pts) == 4: cv2.line(display_frame, pts[0], pts[3], (0, 0, 255), 2)
+
         cv2.imshow(window_name, display_frame)
         key = cv2.waitKey(1)
         
@@ -204,10 +226,17 @@ def define_traffic_light(stream):
                     real_y = int(final_zoom_rect[1] + (pt[1] * scale_y))
                     final_shape.append((real_x, real_y))
                 
+                session.pt_start = None; session.dragging = False; session.step = 3; time.sleep(0.3)
+
+            elif session.step == 3 and len(session.street_points_screen) == 4:
+                # Step 4 fertig: Native Mode -> Native Coords
+                final_street = session.street_points_screen
+                print(f"Street Shape: {final_street}")
+
                 session.finished = True
                 cv2.destroyWindow(window_name)
                 print("Setup Complete.")
-                return {"red_rect": final_red_rect, "shape": final_shape}
+                return {"red_rect": final_red_rect, "shape": final_shape, "street": final_street}
                 
         elif key == ord('q'): 
             cv2.destroyAllWindows(); sys.exit(0)

@@ -42,8 +42,9 @@ def run_surveillance(stream,config):
         status, status_color = detect_red_light(frame,config)
 
         people = detect_people(frame, interpreter, tracker)
-
-        frame = draw_objects(status,status_color,people, config, frame)
+        
+        # Pass traffic status to draw_objects
+        frame = draw_objects(status, status_color, people, config, frame)
 
 
 
@@ -198,13 +199,37 @@ def draw_objects(status, status_color, objects, config, frame):
     rx1, ry1, rx2, ry2 = config["red_rect"]
     shape_pts = np.array(config["shape"], np.int32)
     shape_pts = shape_pts.reshape((-1, 1, 2))
+    
+    # Street Polygon
+    street_pts = np.array(config.get("street", []), np.int32)
+    if len(street_pts) > 0:
+        street_pts = street_pts.reshape((-1, 1, 2))
+        # Draw street area (optional, maybe semi-transparent or just outline)
+        cv2.polylines(frame, [street_pts], isClosed=True, color=(255, 255, 0), thickness=2)
 
 
     # Persons
     for (objectID, box) in objects.items():
         (xmin, ymin, xmax, ymax) = box
-        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
-        cv2.putText(frame, f"ID {objectID}", (xmin, ymin - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        
+        # Default color
+        box_color = (0, 255, 0) # Green
+        
+        # Check intersection with street if traffic light is RED
+        if status == "RED" and len(street_pts) > 0:
+            # Check if the bottom center of the box is inside the street polygon
+            # Using bottom center is better for "feet" position
+            foot_x = int((xmin + xmax) / 2)
+            foot_y = int(ymax)
+            
+            # pointPolygonTest returns positive if inside, negative if outside, 0 if on edge
+            dist = cv2.pointPolygonTest(street_pts, (foot_x, foot_y), False)
+            
+            if dist >= 0:
+                box_color = (0, 0, 255) # Red (Jaywalking!)
+
+        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), box_color, 2)
+        cv2.putText(frame, f"ID {objectID}", (xmin, ymin - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
 
     # Traffic Light Shape
     cv2.polylines(frame, [shape_pts], isClosed=True, color=status_color, thickness=3)
