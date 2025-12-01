@@ -53,16 +53,20 @@ class SetupSession:
         # STEP 3: PUNKTE KLICKEN
         elif self.step == 2:
             if event == cv2.EVENT_LBUTTONDOWN:
-                if len(self.shape_points_screen) < 4:
-                    self.shape_points_screen.append((x, y))
-                    print(f"Point added: {(x, y)}")
+                if len(self.shape_points_screen) >= 4:
+                    self.shape_points_screen = []
+                
+                self.shape_points_screen.append((x, y))
+                print(f"Point added: {(x, y)}")
 
         # STEP 4: STREET DEFINITION (4 POINTS)
         elif self.step == 3:
             if event == cv2.EVENT_LBUTTONDOWN:
-                if len(self.street_points_screen) < 4:
-                    self.street_points_screen.append((x, y))
-                    print(f"Street Point added: {(x, y)}")
+                if len(self.street_points_screen) >= 4:
+                    self.street_points_screen = []
+                
+                self.street_points_screen.append((x, y))
+                print(f"Street Point added: {(x, y)}")
 
 
 

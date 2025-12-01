@@ -4,11 +4,12 @@ from collections import OrderedDict
 
 # --- HELPER: TRACKER ---
 class CentroidTracker:
-    def __init__(self, maxDisappeared=20):
+    def __init__(self, maxDisappeared=20, smoothing_factor=0.3):
         self.nextObjectID = 0
         self.objects = OrderedDict()
         self.disappeared = OrderedDict()
         self.maxDisappeared = maxDisappeared
+        self.smoothing_factor = smoothing_factor
     
     def register(self, centroid):
         self.objects[self.nextObjectID] = centroid
@@ -53,7 +54,14 @@ class CentroidTracker:
             for (row, col) in zip(rows, cols):
                 if row in usedRows or col in usedCols: continue
                 objectID = objectIDs[row]
-                self.objects[objectID] = inputCentroids[col]
+                
+                # Apply Smoothing (EMA)
+                old_box = np.array(self.objects[objectID])
+                new_box = np.array(inputCentroids[col])
+                
+                smoothed_box = (self.smoothing_factor * new_box) + ((1 - self.smoothing_factor) * old_box)
+                self.objects[objectID] = smoothed_box.astype("int")
+                
                 self.disappeared[objectID] = 0
                 usedRows.add(row)
                 usedCols.add(col)
