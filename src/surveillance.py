@@ -5,7 +5,7 @@ from model_outputs import smart_model_processor
 from border_text import draw_border_layer
 
 from tracker_class import CentroidTracker
-from config import FULL_W, FULL_H, PERSON_CLASS_ID, THRESHOLD, BANNER_TEXT, FRAME_DELAY_MS, MODEL_PATH, SCROLL_SPEED, CROP_H
+from config import FULL_W, FULL_H, PERSON_CLASS_ID, THRESHOLD, BANNER_TEXT, FRAME_DELAY_MS, MODEL_PATH, SCROLL_SPEED, CROP_H, TRAFFIC_LIGHT_RED_DIFF_THRESHOLD, TRAFFIC_LIGHT_RED_MIN_VALUE
 
 # --- CORE FUNCTIONS ---
 
@@ -106,7 +106,7 @@ def detect_red_light(frame, config):
         mean_g = np.mean(g)
             
         # Simple Logic: If Red is dominant
-        if mean_r > mean_g + 20 and mean_r > 80:
+        if mean_r > mean_g + TRAFFIC_LIGHT_RED_DIFF_THRESHOLD and mean_r > TRAFFIC_LIGHT_RED_MIN_VALUE:
             traffic_status = "RED"
             status_color = (0, 0, 255)
         else:

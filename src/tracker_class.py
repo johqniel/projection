@@ -1,10 +1,11 @@
 import numpy as np
 
 from collections import OrderedDict
+from config import TRACKER_MAX_DISAPPEARED, TRACKER_SMOOTHING_FACTOR
 
 # --- HELPER: TRACKER ---
 class CentroidTracker:
-    def __init__(self, maxDisappeared=20, smoothing_factor=0.3):
+    def __init__(self, maxDisappeared=TRACKER_MAX_DISAPPEARED, smoothing_factor=TRACKER_SMOOTHING_FACTOR):
         self.nextObjectID = 0
         self.objects = OrderedDict()
         self.disappeared = OrderedDict()
