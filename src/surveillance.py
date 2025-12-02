@@ -5,7 +5,7 @@ from model_outputs import smart_model_processor
 from border_text import draw_border_layer
 
 from tracker_class import CentroidTracker
-from config import FULL_W, FULL_H, PERSON_CLASS_ID, THRESHOLD, BANNER_TEXT, FRAME_DELAY_MS, MODEL_PATH, SCROLL_SPEED, CROP_H, TRAFFIC_LIGHT_RED_DIFF_THRESHOLD, TRAFFIC_LIGHT_RED_MIN_VALUE
+from config import FULL_W, FULL_H, PERSON_CLASS_ID, THRESHOLD, BANNER_TEXT, FRAME_DELAY_MS, MODEL_PATH, SCROLL_SPEED, CROP_H, TRAFFIC_LIGHT_RED_DIFF_THRESHOLD, TRAFFIC_LIGHT_RED_MIN_VALUE, TARGET_FPS
 
 # --- CORE FUNCTIONS ---
 
@@ -16,9 +16,12 @@ try:
     print("Using TFLite Runtime")
 except ImportError:
     # FULL TENSORFLOW (For Mac / PC)
-    # This works with tensorflow-macos too!
-    import tensorflow.lite as tflite
-    print("Using Full TensorFlow")
+    try:
+        import tensorflow.lite as tflite
+        print("Using Full TensorFlow")
+    except ImportError:
+        print("Warning: TensorFlow not found. AI features will be disabled.")
+        tflite = None
 
 def run_surveillance(stream,config):
     """
@@ -61,23 +64,41 @@ def run_surveillance(stream,config):
     
     cv2.destroyAllWindows()
 
-def crop_generator(input_stream):
+def crop_generator(input_stream, crop_rect=None):
     """
     Consumes a stream, crops it, and yields cropped frames.
+    If crop_rect is None, it yields the full frame (resized to standard).
     """
-    # Define Crop Coordinates (Zone 1)
-    # Logic: Right half of the image
-    A_H, B_H = 0, CROP_H
-    A_V, B_V = int(FULL_W - 1.5*CROP_H), FULL_W
-
+    
     for frame in input_stream:
-        # Resize to standard if needed
+        # Crop if defined
+        if crop_rect:
+            x1, y1, x2, y2 = crop_rect
+            # Ensure coordinates are valid
+            h, w = frame.shape[:2]
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(w, x2), min(h, y2)
+            
+            frame = frame[y1:y2, x1:x2]
+            
+        # Resize to standard if needed (to keep UI consistent)
         frame = cv2.resize(frame, (FULL_W, FULL_H))
         
-        # Crop
-        cropped = frame[A_H:B_H, A_V:B_V]
-        
-        yield cropped
+        yield frame
+
+
+def reduce_framerate(stream, fps, target_fps=10):
+    """
+    Yields frames from the stream at a reduced framerate.
+    """
+    skip_frames = max(1, int(fps / target_fps))
+    print(f"Reducing Framerate: Skipping every {skip_frames} frames (Input: {fps:.2f} -> Target: {target_fps})")
+    
+    count = 0
+    for frame in stream:
+        count += 1
+        if count % skip_frames == 0:
+            yield frame
 
 
 

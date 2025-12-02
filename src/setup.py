@@ -248,3 +248,68 @@ def define_traffic_light(stream):
             prop = cv2.getWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN)
             cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN if prop < 1 else cv2.WINDOW_NORMAL)
 
+
+def define_crop_area(stream):
+    """
+    Allows the user to define a crop area for the stream.
+    Returns (x1, y1, x2, y2) or None.
+    """
+    session = SetupSession()
+    # Reuse Step 0 logic (Zoom Rect) for Crop Area
+    session.step = 0 
+    
+    window_name = "DEFINE CROP AREA"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.setMouseCallback(window_name, session.mouse_callback)
+    
+    print("--- CROP SETUP START ---")
+    
+    stream_iter = iter(stream)
+    last_valid_frame = None
+    final_crop_rect = None
+
+    while True:
+        try:
+            frame = next(stream_iter)
+            if frame is not None:
+                last_valid_frame = frame
+        except StopIteration:
+            frame = last_valid_frame
+        
+        if frame is None:
+            if last_valid_frame is not None:
+                frame = last_valid_frame
+            else:
+                time.sleep(0.1)
+                continue
+
+        display_frame = frame.copy()
+        
+        cv2.putText(display_frame, "DRAW CROP AREA (ENTER to Confirm, ENTER without draw for FULL)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        
+        if session.dragging and session.pt_start:
+            cv2.rectangle(display_frame, session.pt_start, session.current_pos, (0, 255, 0), 1)
+        elif session.zoom_rect_screen:
+            r = session.zoom_rect_screen
+            cv2.rectangle(display_frame, (r[0], r[1]), (r[2], r[3]), (0, 255, 0), 2)
+
+        cv2.imshow(window_name, display_frame)
+        key = cv2.waitKey(1)
+
+        if key == 13: # ENTER
+            if session.zoom_rect_screen:
+                final_crop_rect = session.zoom_rect_screen
+                print(f"Crop Area Defined: {final_crop_rect}")
+            else:
+                print("No Crop Area Defined. Using Full Stream.")
+                final_crop_rect = None
+            
+            break
+        
+        elif key == ord('q'):
+            cv2.destroyAllWindows()
+            sys.exit(0)
+
+    cv2.destroyWindow(window_name)
+    return final_crop_rect
+

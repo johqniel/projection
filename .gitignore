@@ -7,3 +7,5 @@
 !.gitignore
 !src/
 !src/** 
+
+src/__pycache__
