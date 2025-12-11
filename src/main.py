@@ -1,9 +1,8 @@
 # import python scripts
 from get_stream import get_raw_stream_generator
 from setup import define_traffic_light
-from surveillance import run_surveillance, crop_generator, reduce_framerate
-
-from config import VIDEO_PATH, VIDEO_URL
+from surveillance import run_surveillance, crop_generator, reduce_framerate, flip_stream_generator
+from config import VIDEO_PATH, VIDEO_URL, FLIP_CODE
 import config
 import get_stream
 import surveillance
@@ -33,13 +32,15 @@ def main_camera():
     
     cropped_stream = crop_generator(raw_stream, crop_rect)
 
+    flipped_stream = flip_stream_generator(cropped_stream, FLIP_CODE)
+
     print("3. Starting Setup Phase...")
-    tl_config = define_traffic_light(cropped_stream)
+    tl_config = define_traffic_light(flipped_stream)
 
     print("4. Starting Surveillance Phase...")
     
     #reduced_stream = reduce_framerate(cropped_stream, fps)
-    run_surveillance(cropped_stream, tl_config)
+    run_surveillance(flipped_stream, tl_config)
 
 def main_sample():
     print("1. Initializing Video Source...")
@@ -53,14 +54,15 @@ def main_sample():
     
     # Apply cropping (and resizing)
     cropped_stream = crop_generator(raw_stream, crop_rect)
+    flipped_stream = flip_stream_generator(cropped_stream, FLIP_CODE)
 
     print("3. Starting Setup Phase...")
     # Let the user define the refference pixels for the traffic light
-    tl_config = define_traffic_light(cropped_stream)
+    tl_config = define_traffic_light(flipped_stream)
 
     print("4. Starting Surveillance Phase...")
     
-    reduced_stream = reduce_framerate(cropped_stream, fps)
+    reduced_stream = reduce_framerate(flipped_stream, fps)
     run_surveillance(reduced_stream, tl_config)
 
 def main_url():
@@ -76,17 +78,19 @@ def main_url():
     crop_rect = setup.define_crop_area(raw_stream)
 
     # Apply cropping (and resizing)
+    # Apply cropping (and resizing)
     cropped_stream = crop_generator(raw_stream, crop_rect)
+    flipped_stream = flip_stream_generator(cropped_stream, FLIP_CODE)
 
     print("3. Starting Setup Phase...")
     # Let the user define the refference pixels for the traffic light
-    tl_config = define_traffic_light(cropped_stream)
+    tl_config = define_traffic_light(flipped_stream)
 
     print("4. Starting Surveillance Phase...")
 
-    reduced_stream = reduce_framerate(cropped_stream, fps)
+    reduced_stream = reduce_framerate(flipped_stream, fps)
 
     run_surveillance(reduced_stream, tl_config)
 
 if __name__ == "__main__":
-    main_camera()
+    main_sample()

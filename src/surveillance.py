@@ -5,7 +5,7 @@ from model_outputs import smart_model_processor
 from border_text import draw_border_layer
 
 from tracker_class import CentroidTracker
-from config import FULL_W, FULL_H, PERSON_CLASS_ID, THRESHOLD, BANNER_TEXT, FRAME_DELAY_MS, MODEL_PATH, SCROLL_SPEED, CROP_H, TRAFFIC_LIGHT_RED_DIFF_THRESHOLD, TRAFFIC_LIGHT_RED_MIN_VALUE, TARGET_FPS
+from config import FULL_W, FULL_H, PERSON_CLASS_ID, THRESHOLD, BANNER_TEXT, FRAME_DELAY_MS, MODEL_PATH, SCROLL_SPEED, CROP_H, TRAFFIC_LIGHT_RED_DIFF_THRESHOLD, TRAFFIC_LIGHT_RED_MIN_VALUE, TARGET_FPS, STREET_VISIBLE
 
 # --- CORE FUNCTIONS ---
 
@@ -37,7 +37,23 @@ def run_surveillance(stream,config):
 
     scroll_dist = 0
 
+    # Precompute Street Mask
+    street_mask = None
+    street_pts = np.array(config.get("street", []), np.int32)
+    if len(street_pts) > 0:
+        # Assuming frame size is constant (FULL_W, FULL_H) after crop/resize logic
+        # But we need the actual frame size. We can init it on the first frame.
+        pass
+
+    first_frame = True
+
     for frame in stream: 
+        if first_frame:
+            h, w = frame.shape[:2]
+            street_mask = np.zeros((h, w), dtype=np.uint8)
+            if len(street_pts) > 0:
+                cv2.fillPoly(street_mask, [street_pts], 255)
+            first_frame = False
 
         key = cv2.waitKey(FRAME_DELAY_MS)
 
@@ -47,7 +63,7 @@ def run_surveillance(stream,config):
         people = detect_people(frame, interpreter, tracker)
         
         # Pass traffic status to draw_objects
-        frame = draw_objects(status, status_color, people, config, frame)
+        frame = draw_objects(status, status_color, people, config, frame, street_mask)
 
 
 
@@ -80,9 +96,9 @@ def crop_generator(input_stream, crop_rect=None):
             x2, y2 = min(w, x2), min(h, y2)
             
             frame = frame[y1:y2, x1:x2]
-            
-        # Resize to standard if needed (to keep UI consistent)
-        frame = cv2.resize(frame, (FULL_W, FULL_H))
+        else:
+            # Resize to standard if needed (to keep UI consistent) ONLY if not cropping
+            frame = cv2.resize(frame, (FULL_W, FULL_H))
         
         yield frame
 
@@ -99,6 +115,14 @@ def reduce_framerate(stream, fps, target_fps=10):
         count += 1
         if count % skip_frames == 0:
             yield frame
+
+
+def flip_stream_generator(stream, flip_code):
+    """
+    Yields flipped frames from the stream.
+    """
+    for frame in stream:
+        yield cv2.flip(frame, flip_code)
 
 
 
@@ -215,7 +239,7 @@ def detect_people(frame, interpreter, tracker, model_output_processor = smart_mo
     objects = tracker.update(rects)
     return objects
 
-def draw_objects(status, status_color, objects, config, frame):
+def draw_objects(status, status_color, objects, config, frame, street_mask):
     # Config Unpack
     rx1, ry1, rx2, ry2 = config["red_rect"]
     shape_pts = np.array(config["shape"], np.int32)
@@ -226,10 +250,13 @@ def draw_objects(status, status_color, objects, config, frame):
     if len(street_pts) > 0:
         street_pts = street_pts.reshape((-1, 1, 2))
         # Draw street area (optional, maybe semi-transparent or just outline)
-        cv2.polylines(frame, [street_pts], isClosed=True, color=(255, 255, 0), thickness=2)
+        if STREET_VISIBLE:
+            cv2.polylines(frame, [street_pts], isClosed=True, color=(255, 255, 0), thickness=2)
 
 
     # Persons
+    h, w = frame.shape[:2]
+    
     for (objectID, box) in objects.items():
         (xmin, ymin, xmax, ymax) = box
         
@@ -237,16 +264,38 @@ def draw_objects(status, status_color, objects, config, frame):
         box_color = (0, 255, 0) # Green
         
         # Check intersection with street if traffic light is RED
-        if status == "RED" and len(street_pts) > 0:
-            # Check if the bottom center of the box is inside the street polygon
-            # Using bottom center is better for "feet" position
-            foot_x = int((xmin + xmax) / 2)
-            foot_y = int(ymax)
+        if status == "RED" and street_mask is not None:
+            is_jaywalking = False
             
-            # pointPolygonTest returns positive if inside, negative if outside, 0 if on edge
-            dist = cv2.pointPolygonTest(street_pts, (foot_x, foot_y), False)
+            # Check if touching border
+            touches_border = (xmin <= 0 or ymin <= 0 or xmax >= w or ymax >= h)
             
-            if dist >= 0:
+            if touches_border:
+                # Case 2: Touching border -> Check if ANY part overlaps
+                # ROI of the box in the mask
+                # Ensure coords are within bounds
+                b_y1, b_y2 = max(0, ymin), min(h, ymax)
+                b_x1, b_x2 = max(0, xmin), min(w, xmax)
+                
+                if b_y2 > b_y1 and b_x2 > b_x1:
+                    mask_roi = street_mask[b_y1:b_y2, b_x1:b_x2]
+                    non_zero = cv2.countNonZero(mask_roi)
+                    if non_zero > 0:
+                        is_jaywalking = True
+            else:
+                # Case 1: Not touching border -> Check if LOWER SIDE touches street
+                # We check a thin strip at the bottom of the box
+                b_y1 = max(0, ymax - 5) # Check last 5 pixels? Or just the line? User said "lower side".
+                b_y2 = min(h, ymax)
+                b_x1, b_x2 = max(0, xmin), min(w, xmax)
+                
+                if b_y2 > b_y1 and b_x2 > b_x1:
+                    mask_roi = street_mask[b_y1:b_y2, b_x1:b_x2]
+                    non_zero = cv2.countNonZero(mask_roi)
+                    if non_zero > 0:
+                        is_jaywalking = True
+
+            if is_jaywalking:
                 box_color = (0, 0, 255) # Red (Jaywalking!)
 
         cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), box_color, 2)
