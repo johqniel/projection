@@ -9,7 +9,7 @@ NMS_THRESHOLD = 0.4 # Threshold for removing overlapping boxes in YOLO
 
 # --- VIDEO INPUT CONFIG ---
 VIDEO_PATH = "/Users/nielo/Desktop/projection/samples/O.mov"
-VIDEO_URL = "https://www.youtube.com/watch?v=rnXIjl_Rzy4" # Falls URL gewünscht
+VIDEO_URL = "https://www.youtube.com/watch?v=S1A49C6V-dg" # Falls URL gewünscht
 
 
 

@@ -93,4 +93,4 @@ def main_url():
     run_surveillance(reduced_stream, tl_config)
 
 if __name__ == "__main__":
-    main_sample()
+    main_url()
