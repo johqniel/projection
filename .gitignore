@@ -16,7 +16,6 @@
 # ignore pyc files
 
 *.pyc
-*.tflite
 *.pt
 *.onnx
 *.npy
