@@ -15,11 +15,11 @@ VIDEO_URL = "https://www.youtube.com/watch?v=S1A49C6V-dg" # Falls URL gewünscht
 
 # Config for people detection
 PERSON_CLASS_ID = 0
-THRESHOLD = 0.4 
+THRESHOLD = 0.5 
 
 # Tracker Config
 TRACKER_MAX_DISAPPEARED = 20
-TRACKER_SMOOTHING_FACTOR = 0.3
+TRACKER_SMOOTHING_FACTOR = 0
 
 # Traffic Light Config
 TRAFFIC_LIGHT_RED_DIFF_THRESHOLD = 20 # mean_r > mean_g + THRESHOLD
