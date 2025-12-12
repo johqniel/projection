@@ -4,19 +4,62 @@ import cv2
 
 from config import PERSON_CLASS_ID, THRESHOLD, NMS_THRESHOLD
 
-# --- Helper detect people ---
+# --- Functions return the model outputs for different models ---
+"""
+Module: model_outputs.py
 
-def get_standard_tflite_outputs(interpreter, frame):
+This module handles the extraction of model outputs from different types of models.
+It provides functions to extract output tensors for standard TFLite detection models (e.g., MobileNet SSD).
+
+Key Functions:
+- `smart_model_processor(...)`: Extracts output tensors for different models.
+    supported models: 
+    - standard tflite
+    - yolo tflite
+
+Dependencies:
+- `config.py`: specific constants (e.g., PERSON_CLASS_ID, THRESHOLD, NMS_THRESHOLD).
+- `cv2` (OpenCV): for video capture and frame processing.
+- `yt_dlp`: for downloading video streams from URLs.
+"""
+
+def smart_model_processor(interpreter, frame):
     """
-    Extracts output tensors for standard TFLite detection models 
-    (e.g., MobileNet SSD).
+    Automatically detects the model type based on output details
+    and routes to the correct processor.
 
     Args:
         interpreter: The TFLite interpreter instance.
-        frame: The input frame (unused here, but kept for function signature consistency).
+        frame (np.ndarray): The input frame to be processed.
 
     Returns:
-        A dictionary containing 'boxes', 'classes', and 'scores' arrays.
+        dict: A dictionary containing detection results ('boxes', 'classes', 'scores').
+    """
+    output_details = interpreter.get_output_details()
+    
+    # Logic: SSD models usually have 4 output tensors. YOLO has 1.
+    if len(output_details) == 1:
+        # Likely YOLO or similar raw-output model
+        return get_yolo_tflite_outputs(interpreter, frame)
+    elif len(output_details) >= 3:
+        # Likely SSD MobileNet (Boxes, Classes, Scores, [Count])
+        return get_standard_tflite_outputs(interpreter, frame)
+    else:
+        print(f"Warning: Unknown model output structure ({len(output_details)} outputs). Defaulting to SSD.")
+        return get_standard_tflite_outputs(interpreter, frame)
+
+
+
+def get_standard_tflite_outputs(interpreter, frame):
+    """
+    Extracts output tensors for standard TFLite detection models (e.g., MobileNet SSD).
+
+    Args:
+        interpreter: The TFLite interpreter instance.
+        frame (np.ndarray): The input frame (unused here, but kept for function signature consistency).
+
+    Returns:
+        dict: A dictionary containing 'boxes' (normalized), 'classes', and 'scores' arrays.
     """
     output_details = interpreter.get_output_details()
     
@@ -38,6 +81,14 @@ def get_yolo_tflite_outputs(interpreter, frame):
     Handles YOLO style models with Vectorized Processing.
     Fixes 'Slowness' by removing Python loops.
     Fixes 'No Detections' by auto-detecting coordinate format.
+
+    Args:
+        interpreter: The TFLite interpreter instance.
+        frame (np.ndarray): The input frame (unused here, but kept for function signature consistency).
+
+    Returns:
+        dict: A dictionary containing 'boxes' (normalized [ymin, xmin, ymax, xmax]),
+              'classes', and 'scores' arrays.
     """
     output_details = interpreter.get_output_details()
     input_details = interpreter.get_input_details()
@@ -146,23 +197,4 @@ def get_yolo_tflite_outputs(interpreter, frame):
         'classes': np.array(final_classes),
         'scores': np.array(final_scores_out)
     }
-
-
-def smart_model_processor(interpreter, frame):
-    """
-    Automatically detects the model type based on output details 
-    and routes to the correct processor.
-    """
-    output_details = interpreter.get_output_details()
-    
-    # Logic: SSD models usually have 4 output tensors. YOLO has 1.
-    if len(output_details) == 1:
-        # Likely YOLO or similar raw-output model
-        return get_yolo_tflite_outputs(interpreter, frame)
-    elif len(output_details) >= 3:
-        # Likely SSD MobileNet (Boxes, Classes, Scores, [Count])
-        return get_standard_tflite_outputs(interpreter, frame)
-    else:
-        print(f"Warning: Unknown model output structure ({len(output_details)} outputs). Defaulting to SSD.")
-        return get_standard_tflite_outputs(interpreter, frame)
 

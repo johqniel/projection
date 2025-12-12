@@ -13,6 +13,7 @@ import setup
 
 
 
+
 # --- MAIN ---
 
 def main_camera():
@@ -88,9 +89,11 @@ def main_url():
 
     print("4. Starting Surveillance Phase...")
 
+
     reduced_stream = reduce_framerate(flipped_stream, fps)
 
     run_surveillance(reduced_stream, tl_config)
+
 
 if __name__ == "__main__":
     main_url()

@@ -7,7 +7,18 @@
 
 # Also allow the .gitignore file itself
 !.gitignore
+!setup_pi.sh
+!requirements.txt
+!requirements.txt
+!setup_pi.sh
 
 # ignore pyc files
 
 *.pyc
+*.tflite
+*.pt
+*.onnx
+*.npy
+*.avi
+*.mov
+*.mp4

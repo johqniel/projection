@@ -2,7 +2,8 @@ import cv2
 import numpy as np
 
 from model_outputs import smart_model_processor
-from border_text import draw_border_layer
+from border_text import draw_border_layer, draw_banner
+from complex_border import draw_border_banner
 
 from tracker_class import CentroidTracker
 from config import FULL_W, FULL_H, PERSON_CLASS_ID, THRESHOLD, BANNER_TEXT, FRAME_DELAY_MS, MODEL_PATH, SCROLL_SPEED, CROP_H, TRAFFIC_LIGHT_RED_DIFF_THRESHOLD, TRAFFIC_LIGHT_RED_MIN_VALUE, TARGET_FPS, STREET_VISIBLE
@@ -67,7 +68,9 @@ def run_surveillance(stream,config):
 
 
 
-        draw_banner(frame, scroll_dist, status, status_color)
+        draw_border_banner(frame,w,h,scroll_dist)
+
+        #draw_banner(frame, scroll_dist, status, status_color)
 
         #draw_border_layer(frame,scroll_dist)
 
@@ -307,21 +310,4 @@ def draw_objects(status, status_color, objects, config, frame, street_mask):
     return(frame)
 
 
-
-def draw_banner(frame, scroll_dist, traffic_status, status_color):
-
-    h,w,_ = frame.shape
-
-    # Scrolling Banner
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (0, 0), (w, 50), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
-        
-    info_text = f"{BANNER_TEXT} | SIGNAL: {traffic_status}"
-    # Simple scrolling logic
-    text_x = 10 - (scroll_dist % (w + 400)) + w
-    cv2.putText(frame, info_text, (text_x, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
-    # Second copy for seamless scroll
-    if text_x < 0:
-         cv2.putText(frame, info_text, (text_x + w + 400, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
 

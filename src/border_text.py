@@ -1,13 +1,107 @@
 import cv2
 import numpy as np
 
-from config import BG_BAR_WIDTH, BANNER_TEXT, letter_spacing, MARGIN, FONT_SCALE, TEXT_COLOR, THICKNESS, BG_ALPHA
+from config import BG_BAR_WIDTH, BANNER_TEXT, LETTER_SPACING, MARGIN, FONT_SCALE, TEXT_COLOR, THICKNESS, BG_ALPHA
 
-# --- HELPER: DRAW BORDER TEXT ----
+# --- Functions to draw the text on the border of the frame ----
+"""
+Module: border_text.py
+
+This module handles the dynamic rendering of text and borders around the perimeter of the video frame.
+It is designed to create a "scrolling marquee" effect that moves along the frame edges.
+
+Key Functions:
+- `draw_border_layer(frame, scroll_dist)`: The main entry point. Orchestrates the drawing of the
+  text and background border based on the current scroll distance. Call this once per frame.
+
+- `draw_rotated_letter(...)`: Draws individual characters rotated to match the border orientation.
+- `get_perimeter_pos(...)` & `get_corner_pos(...)`: Helper functions to map linear distance to (x, y) coordinates on the frame border.
+- `draw_background_border(...)`: Draws the semi-transparent background behind the text.
+
+Dependencies:
+- `config.py`: specific constants (e.g., BG_BAR_WIDTH, MARGIN, FONT_SCALE).
+- `cv2` (OpenCV): for drawing text and shapes.
+- `numpy`: for image manipulation.
+"""
+
+# simple banner on top of the frame 
+def draw_banner(frame, scroll_dist, traffic_status, status_color):
+    """
+    Draws a scrolling banner at the top of the frame.
+
+    Args:
+        frame (np.ndarray): The image frame to process.
+        scroll_dist (int): The current scroll distance for the animation.
+        traffic_status (str): The current traffic status to display.
+        status_color (tuple): The color of the traffic status text (B, G, R).
+    """
+    h,w,_ = frame.shape
+
+    # Scrolling Banner
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (0, 0), (w, 50), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+        
+    info_text = f"{BANNER_TEXT} | SIGNAL: {traffic_status}"
+    # Simple scrolling logic
+    text_x = 10 - (scroll_dist % (w + 400)) + w
+    cv2.putText(frame, info_text, (text_x, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
+    # Second copy for seamless scroll
+    if text_x < 0:
+         cv2.putText(frame, info_text, (text_x + w + 400, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, status_color, 2)
+
+# Complex border with text around the frame 
+def draw_border_layer(frame, scroll_dist):
+    """
+    The orchestrator function you requested.
+    Calculates positions and calls the user's border/text functions.
+
+    Args:
+        frame (np.ndarray): The image frame to process.
+        scroll_dist (int): The current scroll distance for the animation.
+    """
+    if frame is None: return
+    h, w = frame.shape[:2]
+
+    # 1. Logic for snake positions
+    # Calculate positions of first and last character centers
+    # Head (first char) is at scroll_dist
+    last_char_dist = scroll_dist - (len(BANNER_TEXT)) * LETTER_SPACING
+    
+    # Add padding to cover the characters visually (half spacing on each side)
+    padding = int(LETTER_SPACING)
+    
+    head_dist = scroll_dist + padding
+    tail_dist = last_char_dist - padding
+    
+    # 2. Draw Background
+    draw_background_border(frame, w, h, head_dist, tail_dist)
+    
+    # 3. Draw Text
+    # Iterate through the string and place each character
+    for i, char in enumerate(BANNER_TEXT):
+        # Distance of this specific character
+        # (Assuming head is first char, tail is last char)
+        dist = scroll_dist - (i * LETTER_SPACING)
+        
+        # Get position for letter (using actual visual margin)
+        center_pos, angle = get_perimeter_pos(dist, w, h, MARGIN)
+        
+        draw_rotated_letter(frame, char, center_pos, angle, FONT_SCALE, TEXT_COLOR, THICKNESS)
+
 
 def draw_rotated_letter(img, letter, center, angle, scale, color, thickness):
     """
     Draws a single letter rotated around its center.
+
+    Args:
+        img (np.ndarray): The image to draw on.
+        letter (str): The letter to draw.
+        center (tuple): The (x, y) coordinates of the center of the letter.
+        angle (float): The rotation angle in degrees.
+        scale (float): The scale of the font.
+        color (tuple): The color of the text (B, G, R).
+        thickness (int): The thickness of the text.
     """
     # 1. Get size of the letter
     (fw, fh), baseline = cv2.getTextSize(letter, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
@@ -57,8 +151,17 @@ def draw_rotated_letter(img, letter, center, angle, scale, color, thickness):
 
 def get_perimeter_pos(dist, w, h, margin):
     """
-    Maps a linear distance (0 -> Perimeter) to (x, y, angle_degrees)
+    Maps a linear distance (0 -> Perimeter) to (x, y, angle_degrees).
     Path: Bottom(R->L) -> Left(B->T) -> Top(L->R) -> Right(T->B)
+
+    Args:
+        dist (int): The linear distance along the perimeter.
+        w (int): The width of the area.
+        h (int): The height of the area.
+        margin (int): The margin to offset from the edge.
+
+    Returns:
+        tuple: A tuple containing ((x, y), angle).
     """
     # Define lengths of the 4 sides
     # We adjust for margin so text doesn't hit the absolute edge
@@ -94,10 +197,10 @@ def get_perimeter_pos(dist, w, h, margin):
         angle = 90 # Upside down (to face center) or 0. Let's do 180 for "crawling" effect.
         return (x, y), angle
 
-    # 4. Bottom Edge (Moving Right to Left)
+    # 4. Bottom Edge (Moving Left to Right)
     d -= eff_h
     if d < eff_w:
-        x = w - margin - d
+        x = margin + d
         y = h - margin
         angle = 0 # Text reading down
         return (x, y), angle
@@ -106,8 +209,17 @@ def get_perimeter_pos(dist, w, h, margin):
 
 def get_corner_pos(dist, w, h, margin):
     """
-    Maps a linear distance (0 -> Perimeter) to (x, y, angle_degrees)
+    Maps a linear distance (0 -> Perimeter) to (x, y, angle_degrees) for the corner.
     Path: Bottom(R->L) -> Left(B->T) -> Top(L->R) -> Right(T->B)
+
+    Args:
+        dist (int): The linear distance along the perimeter.
+        w (int): The width of the area.
+        h (int): The height of the area.
+        margin (int): The margin to offset from the edge.
+
+    Returns:
+        tuple: A tuple containing ((x, y), angle).
     """
     # Define lengths of the 4 sides
     # We adjust for margin so text doesn't hit the absolute edge
@@ -143,141 +255,107 @@ def get_corner_pos(dist, w, h, margin):
         angle = 90 # Upside down (to face center) or 0. Let's do 180 for "crawling" effect.
         return (x, y), angle
 
-    # 4. Bottom Edge (Moving Right to Left)
+    # 4. Bottom Edge (Moving Left to Right)
     d -= eff_h
     if d < eff_w:
-        x = w - margin - d
+        x = margin + d
         y = h
         angle = 0 # Text reading down
         return (x, y), angle
         
     return (0,0), 0
 
-def draw_background_border(frame, w, h, start_pos, end_pos):
-    """Draws a semi-transparent frame around the image   """
-    overlay = frame.copy()
-
-    rect_A_1 = (0,0)
-    rect_A_2 = (0,0)
-
-    rect_B_1 = (0,0)
-    rect_B_2 = (0,0)
-
-    rect_C_1 = (0,0)
-    rect_C_2 = (0,0)
-
-    # ends left border
-    if (end_pos[0] == 0):
-        rect_A_1 = (0,0)
-        rect_A_2 = (BG_BAR_WIDTH,end_pos[1])
-
-        # starts top border
-        if start_pos[1] == 0:
-            rect_B_1 = (BG_BAR_WIDTH,0)
-            rect_B_2 = (start_pos[0],BG_BAR_WIDTH)
-
-        # start right border
-        if start_pos[0] == w:
-            rect_B_1 = (BG_BAR_WIDTH,0)
-            rect_B_2 = (w-BG_BAR_WIDTH,BG_BAR_WIDTH)
-
-            rect_C_1 = (w-BG_BAR_WIDTH,0)
-            rect_C_2 = (w,start_pos[1])
-
-    # ends right border
-    if (end_pos[0] == w):
-        rect_A_1 = (w-BG_BAR_WIDTH,end_pos[1])
-        rect_A_2 = (w,h)
-        #start bot border
-        if (start_pos[1] == h):
-            rect_B_1 = (start_pos[0],h-BG_BAR_WIDTH)
-            rect_B_2 = (0,h)
-        #starts left border
-        if (start_pos[0] == 0):
-            rect_B_1 = (BG_BAR_WIDTH, h -BG_BAR_WIDTH)
-            rect_B_2 = (w-BG_BAR_WIDTH,h)
-
-            rect_C_1 = (0,start_pos[1])
-            rect_C_2 = (BG_BAR_WIDTH, h)
-
-    # ends top border
-    if (end_pos[1] == 0):
-        rect_A_1 = (end_pos[0],0)
-        rect_A_2 = (w,BG_BAR_WIDTH)
-        # starts right border
-        if (start_pos[0] == w):
-            rect_B_1 = (w - BG_BAR_WIDTH, BG_BAR_WIDTH)
-            rect_B_2 = (w,start_pos[1])
-        #starts bottom border
-        if (start_pos[1] == h):
-            rect_B_1 = (w-BG_BAR_WIDTH,BG_BAR_WIDTH)
-            rect_B_2 = (w,h)
-
-            rect_C_1 = (0,h - BG_BAR_WIDTH)
-            rect_C_2 = (start_pos[0], h)
-
-
-    # ends bot border
-    if (end_pos[1] == h):
-        rect_A_1 = (end_pos[0],h-BG_BAR_WIDTH)
-        rect_A_2 = (w,h)
-        # starts left border
-        if (start_pos[0] == 0):
-            rect_B_1 = (0,start_pos[1])
-            rect_B_2 = (BG_BAR_WIDTH,h)
-        #starts top border
-        if (start_pos[1] == 0):
-            rect_B_1 = (0,BG_BAR_WIDTH)
-            rect_B_2 = (BG_BAR_WIDTH,h)
-
-            rect_C_1 = (0,0)
-            rect_C_2 = (start_pos[0], BG_BAR_WIDTH)
-
+def draw_segment(overlay, start_d, end_d, w, h):
+    """
+    Helper to draw a continuous segment of the border background.
+    """
+    # Normalize lengths
     
+    # Range of each side in the linear domain 0 -> Perimeter
+    # Side 1: Right (0 -> h)
+    s1_start, s1_end = 0, h
+    # Side 2: Top (h -> h+w)
+    s2_start, s2_end = h, h+w
+    # Side 3: Left (h+w -> h+w+h)
+    s3_start, s3_end = h+w, h+w+h
+    # Side 4: Bottom (h+w+h -> h+w+h+w)
+    s4_start, s4_end = h+w+h, h+w+h+w
+    
+    def intersect(range_start, range_end, seg_start, seg_end):
+        return max(range_start, seg_start), min(range_end, seg_end)
+    
+    # 1. Check Side 1 (Right)
+    i_start, i_end = intersect(s1_start, s1_end, start_d, end_d)
+    if i_start < i_end:
+        # Map back to coords. Side 1 goes y: h -> 0 (Bottom to Top)
+        # 0 corresponds to bottom (h), h corresponds to top (0)
+        # local d: 0 is bottom, h is top.
+        y_bot = h - (i_start - s1_start)
+        y_top = h - (i_end - s1_start)
+        # Rect: Right edge. x is [w-BG_BAR_WIDTH, w]
+        cv2.rectangle(overlay, (w - BG_BAR_WIDTH, y_top), (w, y_bot), (0,0,0), -1)
 
-    # Draw 3 rectangles (Non-overlapping to keep corners even)
-    # 1. End bar
-    cv2.rectangle(overlay, rect_A_1, rect_A_2, (0,0,0), -1)
-    # 2. Second Bar 
-    cv2.rectangle(overlay, rect_B_1, rect_B_2, (0,0,0), -1)
-    # 3. Third Bar 
-    cv2.rectangle(overlay,rect_C_1,rect_C_2, (0,0,0), -1)
+    # 2. Check Side 2 (Top)
+    i_start, i_end = intersect(s2_start, s2_end, start_d, end_d)
+    if i_start < i_end:
+        # Side 2 goes x: w -> 0 (Right to Left)
+        # 0 (local) is Right (w), w (local) is Left (0)
+        x_right = w - (i_start - s2_start)
+        x_left = w - (i_end - s2_start)
+        # Rect: Top edge. y is [0, BG_BAR_WIDTH]
+        cv2.rectangle(overlay, (x_left, 0), (x_right, BG_BAR_WIDTH), (0,0,0), -1)
 
+    # 3. Check Side 3 (Left)
+    i_start, i_end = intersect(s3_start, s3_end, start_d, end_d)
+    if i_start < i_end:
+        # Side 3 goes y: 0 -> h (Top to Bottom)
+        y_top = (i_start - s3_start)
+        y_bot = (i_end - s3_start)
+        # Rect: Left edge. x is [0, BG_BAR_WIDTH]
+        cv2.rectangle(overlay, (0, y_top), (BG_BAR_WIDTH, y_bot), (0,0,0), -1)
+
+    # 4. Check Side 4 (Bottom)
+    i_start, i_end = intersect(s4_start, s4_end, start_d, end_d)
+    if i_start < i_end:
+        # Side 4 goes x: 0 -> w (Left to Right)
+        x_left = (i_start - s4_start)
+        x_right = (i_end - s4_start)
+        # Rect: Bottom edge. y is [h-BG_BAR_WIDTH, h]
+        cv2.rectangle(overlay, (x_left, h-BG_BAR_WIDTH), (x_right, h), (0,0,0), -1)
+
+
+def draw_background_border(frame, w, h, head_dist, tail_dist):
+    """
+    Draws a semi-transparent frame around the image based on start and end distances.
+    Handles wrapping around the perimeter.
+
+    Args:
+        frame (np.ndarray): The image to draw on.
+        w (int): The width of the frame.
+        h (int): The height of the frame.
+        head_dist (int): The linear distance of the head of the text.
+        tail_dist (int): The linear distance of the tail of the text.
+    """
+    overlay = frame.copy()
+    
+    # We use margin=0 logic for background, so full perimeter
+    perimeter = 2 * w + 2 * h
+    
+    # Normalize distances to [0, perimeter]
+    d_start = tail_dist % perimeter
+    d_end = head_dist % perimeter
+    
+    if d_start <= d_end:
+        # Continuous segment
+        draw_segment(overlay, d_start, d_end, w, h)
+    else:
+        # Wraps around
+        # 1. d_start to Perimeter
+        draw_segment(overlay, d_start, perimeter, w, h)
+        # 2. 0 to d_end
+        draw_segment(overlay, 0, d_end, w, h)
     
     # Apply the transparency
     cv2.addWeighted(overlay, BG_ALPHA, frame, 1 - BG_ALPHA, 0, frame)
 
 
-def draw_border_layer(frame, scroll_dist):
-    """
-    The orchestrator function you requested. 
-    Calculates positions and calls the user's border/text functions.
-    """
-    if frame is None: return
-    h, w = frame.shape[:2]
-
-    # 1. Logic for snake positions
-    # Calculate length of the text string in pixels
-    text_len = len(BANNER_TEXT) * letter_spacing
-    
-    head_dist = scroll_dist
-    tail_dist = scroll_dist - text_len
-    
-    # 2. Draw Background
-    # We use margin=0 for corner pos because background logic expects exact edges (0 or w)
-    head_corner_pos, _ = get_corner_pos(head_dist, w, h, 0)
-    tail_corner_pos, _ = get_corner_pos(tail_dist, w, h, 0)
-    
-    draw_background_border(frame, w, h, head_corner_pos, tail_corner_pos)
-    
-    # 3. Draw Text
-    # Iterate through the string and place each character
-    for i, char in enumerate(BANNER_TEXT):
-        # Distance of this specific character
-        # (Assuming head is first char, tail is last char)
-        dist = scroll_dist - (i * letter_spacing)
-        
-        # Get position for letter (using actual visual margin)
-        center_pos, angle = get_perimeter_pos(dist, w, h, MARGIN)
-        
-        draw_rotated_letter(frame, char, center_pos, angle, FONT_SCALE, TEXT_COLOR, THICKNESS)
