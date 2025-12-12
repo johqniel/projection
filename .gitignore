@@ -11,7 +11,7 @@
 !requirements.txt
 !requirements.txt
 !setup_pi.sh
-!detect.flite
+!detect.tflite
 
 # ignore pyc files
 
