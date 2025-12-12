@@ -106,7 +106,7 @@ def crop_generator(input_stream, crop_rect=None):
         yield frame
 
 
-def reduce_framerate(stream, fps, target_fps=10):
+def reduce_framerate(stream, fps, target_fps=25):
     """
     Yields frames from the stream at a reduced framerate.
     """

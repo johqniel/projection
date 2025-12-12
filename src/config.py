@@ -15,11 +15,11 @@ VIDEO_URL = "https://www.youtube.com/watch?v=S1A49C6V-dg" # Falls URL gewünscht
 
 # Config for people detection
 PERSON_CLASS_ID = 0
-THRESHOLD = 0.5 
+THRESHOLD = 0.7 
 
 # Tracker Config
 TRACKER_MAX_DISAPPEARED = 20
-TRACKER_SMOOTHING_FACTOR = 0
+TRACKER_SMOOTHING_FACTOR = 0.5
 
 # Traffic Light Config
 TRAFFIC_LIGHT_RED_DIFF_THRESHOLD = 20 # mean_r > mean_g + THRESHOLD
@@ -29,7 +29,7 @@ TRAFFIC_LIGHT_RED_MIN_VALUE = 80      # mean_r > MIN_VALUE
 STREET_VISIBLE = False
 
 # Visual Config
-TARGET_FPS = 10
+TARGET_FPS = 12
 FULL_W, FULL_H = 1280, 720
 FRAME_DELAY_MS = 1
 CROP_W, CROP_H = FULL_W // 2, FULL_H // 2
