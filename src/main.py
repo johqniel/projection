@@ -1,12 +1,15 @@
 # import python scripts
-from get_stream import get_raw_stream_generator
-from setup import define_traffic_light
-from surveillance import run_surveillance, crop_generator, reduce_framerate, flip_stream_generator
+
+from stream import get_raw_stream_generator
+from stream import crop_generator, reduce_framerate, flip_stream_generator
+
+from setup import define_crop_area, define_traffic_light
+
+from surveillance import run_surveillance
+
 from config import VIDEO_PATH, VIDEO_URL, FLIP_CODE, TARGET_FPS
-import config
-import get_stream
-import surveillance
-import setup
+
+
 
 
 
@@ -31,7 +34,7 @@ def main_camera():
     stream = reduce_framerate(raw_stream, fps, TARGET_FPS)
 
     print("2. Define Crop Area...")
-    crop_rect = setup.define_crop_area(stream)
+    crop_rect = define_crop_area(stream)
     
     stream = crop_generator(stream, crop_rect)
 
@@ -54,7 +57,7 @@ def main_sample():
 
     print("2. Define Crop Area...")
     # Let the user define the crop area
-    crop_rect = setup.define_crop_area(stream)
+    crop_rect = define_crop_area(stream)
     
     # Apply cropping (and resizing)
     stream = crop_generator(stream, crop_rect)
@@ -75,12 +78,12 @@ def main_url():
     
     print("Frame rate of input video: ", fps)
 
-    stream = reduce_framerate(stream, fps)
+    stream = reduce_framerate(stream, fps, TARGET_FPS)
 
 
     print("2. Define Crop Area ...")
 
-    crop_rect = setup.define_crop_area(stream)
+    crop_rect = define_crop_area(stream)
 
     # Apply cropping (and resizing)
     # Apply cropping (and resizing)
@@ -97,4 +100,4 @@ def main_url():
 
 
 if __name__ == "__main__":
-    main_camera()
+    main_sample()

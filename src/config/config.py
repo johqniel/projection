@@ -2,6 +2,7 @@
 # --- MODEL CONFIGURATION ---
 MODEL_PATH = "detect.tflite" 
 #MODEL_PATH = "yolo11n_float32.tflite"
+MODEL_PATH = "yolov5s_f16.tflite"
 
 # --- YOLO specific config ---
 NMS_THRESHOLD = 0.4 # Threshold for removing overlapping boxes in YOLO
@@ -29,7 +30,7 @@ TRAFFIC_LIGHT_RED_MIN_VALUE = 80      # mean_r > MIN_VALUE
 STREET_VISIBLE = False
 
 # Visual Config
-TARGET_FPS = 12
+TARGET_FPS = 15
 FULL_W, FULL_H = 1280, 720
 FRAME_DELAY_MS = 1
 CROP_W, CROP_H = FULL_W // 2, FULL_H // 2

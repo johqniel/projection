@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import config
+import time
 from get_stream import get_raw_stream_generator
 import surveillance
 from tracker_class import CentroidTracker
@@ -26,12 +27,17 @@ def run_people_detection_only():
     fps, stream = get_raw_stream_generator(config.VIDEO_PATH, loop=True)
     print(f"Input FPS: {fps}")
 
+    print(f"Reducing analysis FPS to {config.TARGET_FPS}")
+    stream = surveillance.reduce_framerate(stream, fps, config.TARGET_FPS, True)
+
+    print(f"Loading model from: {config.MODEL_PATH}")
+
     # 2. Init AI
     if tflite is None:
         print("Error: TensorFlow Lite not found. Cannot run detection.")
         return
 
-    interpreter = tflite.Interpreter(model_path=config.MODEL_PATH)
+    interpreter = tflite.Interpreter(model_path=config.MODEL_PATH, num_threads=4)
     interpreter.allocate_tensors()
 
     tracker = CentroidTracker()
@@ -44,33 +50,70 @@ def run_people_detection_only():
         "street": []                   # No street defined
     }
 
-    stream = surveillance.reduce_framerate(stream, fps, config.TARGET_FPS)
 
 
+
+    # Target frame interval in seconds
+    target_interval = 1.0 / config.TARGET_FPS
 
     # 4. Main Loop
     for frame in stream:
-        # Resize to standard size (important for consistent detection)
-        # surveillance.detect_people expects the frame, usually resized or original?
-        # In run_surveillance, frames come from the stream.
-        # If we use main.py logic, frames are cropped/resized before.
-        # But here we skip crop, so we should at least resize to FULL_W, FULL_H 
-        # to match the canvas size expected by the UI/Config (even if dummy).
+        loop_start = time.time()
         
         frame = cv2.resize(frame, (config.FULL_W, config.FULL_H))
 
         # Detect People
-        # status="GREEN" -> Traffic light is assumed green, so no jaywalking check.
-        # street_mask=None -> No street mask needed for Green status.
-        
+        t0 = time.time()
         people = surveillance.detect_people(frame, interpreter, tracker)
+        t1 = time.time()
         
         # Plot Objects
-        # We pass "GREEN" so it plots boxes in Green (unless configured otherwise in draw_objects)
-        # and skips jaywalking logic.
         surveillance.draw_objects("GREEN", (0, 255, 0), people, dummy_config, frame, None)
+        t2 = time.time()
+
+        print(f"Detect: {(t1-t0)*1000:.1f}ms | Draw: {(t2-t1)*1000:.1f}ms")
 
         cv2.imshow("TEST - People Detection Only", frame)
+
+        # Calculate how long processing took
+        processing_time = time.time() - loop_start
+        
+        # Calculate remaining time to wait to match target FPS
+        wait_time = target_interval - processing_time
+        delay_ms = max(1, int(wait_time * 1000))
+        
+        # Quit on 'q'
+        if cv2.waitKey(delay_ms) & 0xFF == ord('q'):
+            break
+
+    cv2.destroyAllWindows()
+
+def reduce_framerate_only():
+    print("1. Initializing Video Source...")
+    fps, stream = get_raw_stream_generator(config.VIDEO_PATH, loop=True)
+    print(f"Input FPS: {fps}")
+    print(f"Reducing analysis FPS to {config.TARGET_FPS}")
+    # Enable real-time playback simulation since we are reading from file
+    stream = surveillance.reduce_framerate(stream, fps, config.TARGET_FPS, real_time_playback=False)
+
+    # 4. Main Loop
+    for frame in stream:
+        cv2.imshow("TEST - Reduce Framerate Only", frame)
+
+        # Quit on 'q'
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cv2.destroyAllWindows()
+
+def playback_raw_stream():
+    print("1. Initializing Video Source...")
+    fps, stream = get_raw_stream_generator(config.VIDEO_PATH, loop=True)
+    print(f"Input FPS: {fps}")
+    
+    # 4. Main Loop
+    for frame in stream:
+        cv2.imshow("TEST - Raw Stream", frame)
 
         # Quit on 'q'
         if cv2.waitKey(1) & 0xFF == ord('q'):
