@@ -1,11 +1,17 @@
 import cv2
 import numpy as np
-import config
 import time
-from get_stream import get_raw_stream_generator
-import surveillance
-from tracker_class import CentroidTracker
 
+from config import GAMMA, VIDEO_PATH, TARGET_FPS, MODEL_PATH, FULL_W, FULL_H
+
+from stream import get_raw_stream_generator
+from stream import enhance_light_generator
+from stream import reduce_framerate
+
+from analysis import detect_people
+from analysis import CentroidTracker
+
+from plotting import draw_objects
 # Try to import TFLite just like in surveillance.py
 try:
     import tflite_runtime.interpreter as tflite
@@ -22,22 +28,22 @@ def run_people_detection_only():
     print("--- Starting People Detection Test (No Setup) ---")
 
     # 1. Get Stream
-    print(f"Loading video from: {config.VIDEO_PATH}")
+    print(f"Loading video from: {VIDEO_PATH}")
     # Note: get_raw_stream_generator returns (fps, generator)
-    fps, stream = get_raw_stream_generator(config.VIDEO_PATH, loop=True)
+    fps, stream = get_raw_stream_generator(VIDEO_PATH, loop=True)
     print(f"Input FPS: {fps}")
 
-    print(f"Reducing analysis FPS to {config.TARGET_FPS}")
-    stream = surveillance.reduce_framerate(stream, fps, config.TARGET_FPS, True)
+    print(f"Reducing analysis FPS to {TARGET_FPS}")
+    stream = reduce_framerate(stream, fps, TARGET_FPS, True)
 
-    print(f"Loading model from: {config.MODEL_PATH}")
+    print(f"Loading model from: {MODEL_PATH}")
 
     # 2. Init AI
     if tflite is None:
         print("Error: TensorFlow Lite not found. Cannot run detection.")
         return
 
-    interpreter = tflite.Interpreter(model_path=config.MODEL_PATH, num_threads=4)
+    interpreter = tflite.Interpreter(model_path=MODEL_PATH, num_threads=4)
     interpreter.allocate_tensors()
 
     tracker = CentroidTracker()
@@ -54,21 +60,21 @@ def run_people_detection_only():
 
 
     # Target frame interval in seconds
-    target_interval = 1.0 / config.TARGET_FPS
+    target_interval = 1.0 / TARGET_FPS
 
     # 4. Main Loop
     for frame in stream:
         loop_start = time.time()
         
-        frame = cv2.resize(frame, (config.FULL_W, config.FULL_H))
+        frame = cv2.resize(frame, (FULL_W, FULL_H))
 
         # Detect People
         t0 = time.time()
-        people = surveillance.detect_people(frame, interpreter, tracker)
+        people = detect_people(frame, interpreter, tracker)
         t1 = time.time()
         
         # Plot Objects
-        surveillance.draw_objects("GREEN", (0, 255, 0), people, dummy_config, frame, None)
+        draw_objects("GREEN", (0, 255, 0), people, dummy_config, frame, None)
         t2 = time.time()
 
         print(f"Detect: {(t1-t0)*1000:.1f}ms | Draw: {(t2-t1)*1000:.1f}ms")
@@ -121,5 +127,23 @@ def playback_raw_stream():
 
     cv2.destroyAllWindows()
 
+def gamma_filter_only():
+    print("1. Initializing Video Source...")
+    fps, stream = get_raw_stream_generator(VIDEO_PATH, loop=True)
+    print(f"Input FPS: {fps}")
+    
+    stream = enhance_light_generator(stream)
+
+    # 4. Main Loop
+    for frame in stream:
+        cv2.imshow("TEST - Gamma Filter Only", frame)
+
+        # Quit on 'q'
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cv2.destroyAllWindows()
+
 if __name__ == "__main__":
-    run_people_detection_only()
+    gamma_filter_only()
+    #run_people_detection_only()

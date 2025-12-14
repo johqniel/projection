@@ -1,7 +1,9 @@
 import cv2
 import time
+import numpy as np
 
-from config import FULL_W, FULL_H
+
+from config import FULL_W, FULL_H, GAMMA, CLIP_LIMIT
 
 def crop_generator(input_stream, crop_rect=None):
     """
@@ -52,3 +54,64 @@ def flip_stream_generator(stream, flip_code):
     for frame in stream:
         yield cv2.flip(frame, flip_code)
 
+
+def apply_gamma(image, gamma=0.5):
+    # If gamma is 0.5, we want the exponent to be 0.5 (square root), which brightens.
+    # We do NOT invert it this time.
+    
+    table = np.array([((i / 255.0) ** gamma) * 255
+                      for i in np.arange(0, 256)]).astype("uint8")
+    
+    return cv2.LUT(image, table)
+
+def apply_clahe(image,clip_limit = 2.0, tile_grid_size = (8, 8)):
+    # 1. Convert to LAB color space (we only want to brighten the 'L' - Lightness channel)
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    
+    # 2. Split the channels
+    l, a, b = cv2.split(lab)
+    
+    # 3. Apply CLAHE to the L-channel
+    # clipLimit -> Threshold for contrast limiting (try 2.0 to 4.0)
+    # tileGridSize -> Size of the grid for histogram equalization
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+    cl = clahe.apply(l)
+    
+    # 4. Merge channels back and convert to BGR
+    limg = cv2.merge((cl, a, b))
+    final = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+    
+    return final
+
+def enhance_light_generator(input_stream):
+    """
+    Generator that takes a stream of frames and yields brighter frames.
+    """
+    for frame in input_stream:
+        # Apply the correction
+        enhanced_frame = apply_clahe(frame, CLIP_LIMIT)
+        yield enhanced_frame
+
+import cv2
+
+def invert_colors_generator(input_stream):
+    """
+    Generator that inverts the colors of every frame in the stream.
+    White becomes Black, Blue becomes Orange, etc.
+    """
+    for frame in input_stream:
+        # cv2.bitwise_not calculates (255 - pixel_value) for every pixel
+        inverted_frame = cv2.bitwise_not(frame)
+        yield inverted_frame
+
+def invert_stream_data_generator(stream_data):
+    """
+    Generator that inverts colors for a stream of data tuples.
+    Expected format: (frame, ...)
+    Yields: (inverted_frame, ...)
+    """
+    for item in stream_data:
+        frame = item[0]
+        inverted_frame = cv2.bitwise_not(frame)
+        # Reconstruct tuple with new frame
+        yield (inverted_frame,) + item[1:]

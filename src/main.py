@@ -1,7 +1,7 @@
 # import python scripts
 
-from stream import get_raw_stream_generator
-from stream import crop_generator, reduce_framerate, flip_stream_generator
+from stream import get_raw_stream_generator, get_camera_stream_generator
+from stream import crop_generator, reduce_framerate, flip_stream_generator, enhance_light_generator
 
 from setup import define_crop_area, define_traffic_light
 
@@ -24,7 +24,7 @@ def main_camera():
     # Use device index 0 (or 1 if 0 is built-in webcam)
     # The user mentioned HDMI capture card, which is often 0 or 1.
     try:
-        fps, raw_stream = get_stream.get_camera_stream_generator(0)
+        fps, raw_stream = get_camera_stream_generator(0)
     except ValueError:
          print("Camera 0 failed, trying Camera 1...")
          fps, raw_stream = get_stream.get_camera_stream_generator(1)
@@ -59,6 +59,7 @@ def main_sample():
     # Let the user define the crop area
     crop_rect = define_crop_area(stream)
     
+    print("Optimize Stream...")
     # Apply cropping (and resizing)
     stream = crop_generator(stream, crop_rect)
     stream = flip_stream_generator(stream, FLIP_CODE)
@@ -67,7 +68,10 @@ def main_sample():
     # Let the user define the refference pixels for the traffic light
     tl_config = define_traffic_light(stream)
 
-    print("4. Starting Surveillance Phase...")
+    print("4. Optimizing Stream...")
+    stream = enhance_light_generator(stream)
+
+    print("5. Starting Surveillance Phase...")
     
     run_surveillance(stream, tl_config)
 

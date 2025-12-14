@@ -9,7 +9,7 @@ NMS_THRESHOLD = 0.4 # Threshold for removing overlapping boxes in YOLO
 
 
 # --- VIDEO INPUT CONFIG ---
-VIDEO_PATH = "/Users/nielo/Desktop/projection/samples/N.mov"
+VIDEO_PATH = "/Users/nielo/Desktop/projection/samples/M.mov"
 VIDEO_URL = "https://www.youtube.com/watch?v=S1A49C6V-dg" # Falls URL gewünscht
 
 
@@ -47,6 +47,13 @@ FONT_SCALE = 1.2
 THICKNESS = 2
 MARGIN = 40  
 LETTER_SPACING = int(FONT_SCALE * 20)
+
+
+# Config for gamma filter
+GAMMA = 1.5
+
+CLIP_LIMIT = 4.0
+
 
 
 
