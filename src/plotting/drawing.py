@@ -26,6 +26,7 @@ def draw_objects(status, status_color, objects, config, frame, street_mask):
         
         # Default color
         box_color = (0, 255, 0) # Green
+        thickness = 2
         
         # Check intersection with street if traffic light is RED
         if status == "RED" and street_mask is not None:
@@ -61,8 +62,9 @@ def draw_objects(status, status_color, objects, config, frame, street_mask):
 
             if is_jaywalking:
                 box_color = (0, 0, 255) # Red (Jaywalking!)
+                thickness = 8
 
-        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), box_color, 2)
+        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), box_color, thickness)
         cv2.putText(frame, f"ID {objectID}", (xmin, ymin - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
 
     # Traffic Light Shape
@@ -122,6 +124,7 @@ def draw_objects_emojis(status, status_color, objects, config, frame, street_mas
         (xmin, ymin, xmax, ymax) = box
         
         box_color = (0, 255, 0) # Green
+        thickness = 2
         is_jaywalking = False
         
         # Check intersection with street if traffic light is RED
@@ -147,6 +150,7 @@ def draw_objects_emojis(status, status_color, objects, config, frame, street_mas
 
             if is_jaywalking:
                 box_color = (0, 0, 255) # Red
+                thickness = 8
                 
                 # --- EMOJI SPAWN LOGIC ---
                 # Retrieve tracked object state if possible, or just spawn randomly
@@ -160,7 +164,7 @@ def draw_objects_emojis(status, status_color, objects, config, frame, street_mas
                     'life': 30 # frames
                 })
 
-        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), box_color, 2)
+        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), box_color, thickness)
         cv2.putText(frame, f"ID {objectID}", (xmin, ymin - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
 
     # Traffic Light Shape
@@ -299,6 +303,7 @@ def draw_objects_image_emojis(status, status_color, objects, config, frame, stre
     for (objectID, box) in objects.items():
         (xmin, ymin, xmax, ymax) = box
         box_color = (0, 255, 0)
+        thickness = 2
         is_jaywalking = False
         
         if status == "RED" and street_mask is not None:
@@ -318,6 +323,7 @@ def draw_objects_image_emojis(status, status_color, objects, config, frame, stre
 
             if is_jaywalking:
                 box_color = (0, 0, 255)
+                thickness = 20
                 EMOJI_PARTICLES.append({
                     'x': float(xmin + xmax) / 2,
                     'y': float(ymin),
@@ -327,7 +333,7 @@ def draw_objects_image_emojis(status, status_color, objects, config, frame, stre
                     'life': 30
                 })
 
-        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), box_color, 2)
+        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), box_color, thickness)
         cv2.putText(frame, f"ID {objectID}", (xmin, ymin - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2)
 
     cv2.polylines(frame, [shape_pts], isClosed=True, color=status_color, thickness=3)

@@ -189,4 +189,4 @@ def main_modular(use_enhancement=False, invert_colors=False, use_emojis=True):
 if __name__ == "__main__":
     # Example usage:
     # main_modular(use_enhancement=True, invert_colors=True, use_emojis=True)
-    main_modular(use_enhancement=True, invert_colors=False, use_emojis=True)
+    main_modular(use_enhancement=True, invert_colors=False, use_emojis=False)

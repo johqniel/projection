@@ -38,7 +38,7 @@ def detect_red_light(frame, config):
         # Simple Logic: If Red is dominant
         if mean_r > mean_g + TRAFFIC_LIGHT_RED_DIFF_THRESHOLD and mean_r > TRAFFIC_LIGHT_RED_MIN_VALUE:
             traffic_status = "RED"
-            status_color = (0, 0, 255)
+            status_color = (203, 192, 255)
         else:
             traffic_status = "GREEN"
             status_color = (0, 255, 0)
