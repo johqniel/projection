@@ -51,83 +51,25 @@ except ImportError:
         print("Warning: TensorFlow not found. AI features will be disabled.")
         tflite = None
 
-def main_modular_sample():
-    print("1. Initializing sample Source...")
-    # Use device index 0 (or 1 if 0 is built-in webcam)
-    fps, raw_stream = get_raw_stream_generator(VIDEO_PATH, loop=True)
-    print(f"sample FPS: {fps}")
 
-    stream = reduce_framerate(raw_stream, fps, TARGET_FPS)
-
-    print("2. Define Crop Area...")
-    crop_rect = define_crop_area(stream)
-    
-    stream = crop_generator(stream, crop_rect)
-
-    stream = flip_stream_generator(stream, FLIP_CODE)
-
-    print("3. Starting Setup Phase...")
-    tl_config = define_traffic_light(stream)
-
-    print("4. Optimizing Stream...")
-    stream = enhance_light_generator(stream)
-
-    print("5. Starting Modular Surveillance Phase...")
-    
-    # --- Modular Pipeline ---
-    
-    # 1. Initialize State needed for modules
-    street_mask = None
-    street_pts = np.array(tl_config.get("street", []), np.int32)
-
-    w_crop = crop_rect[2] - crop_rect[0]
-    h_crop = crop_rect[3] - crop_rect[1]
-    
-    street_mask = np.zeros((h_crop, w_crop), dtype=np.uint8)
-    if len(street_pts) > 0:
-        cv2.fillPoly(street_mask, [street_pts], 255)
-    
-    # 2. Init AI & Tracker
-    interpreter = tflite.Interpreter(model_path=MODEL_PATH, num_threads=4)
-    interpreter.allocate_tensors()
-    tracker = CentroidTracker()
-
-    # 3. Build Pipeline
-    # Stream -> Red Light Analysis
-    # stream data contains frame, status, status_color
-    stream_data = detect_redlight_stream(stream, tl_config)
-    
-    # Red Light -> People Detection
-    # stream data contains frame, status, status_color, people
-    stream_data = detect_people_stream(stream_data, interpreter, tracker)
-    
-    # People -> Drawing
-    # Toggle emojis with a boolean (optional, hardcoded for now or parameterize)
-    stream = draw_objects_stream(stream_data, tl_config, street_mask, use_emojis=True)
-    
-    # 4. Display
-    show_stream(stream, window_name="Modular Surveillance")
-
-
-    show_stream(stream, window_name="Modular Surveillance")
-
-
-def main_modular(use_enhancement=False, invert_colors=False, use_emojis=True):
+def main_modular(use_enhancement=True, invert_colors=False, use_emojis=True, sample_source=False, url_source=False):
     print(f"--- Starting Modular Surveillance ---")
-    print(f"Features: Enhance={use_enhancement}, Invert={invert_colors}, Emojis={use_emojis}")
+    print(f"Features: Enhance={use_enhancement}, Invert={invert_colors}, Emojis={use_emojis}, SAMPLE_SOURCE={sample_source}")
 
-    print("1. Initializing Camera Source...")
-    # Use device index 0 (or 1 if 0 is built-in webcam)
-    try:
-        fps, raw_stream = get_camera_stream_generator(0)
-    except ValueError:
-         print("Camera 0 failed, trying Camera 1...")
-         fps, raw_stream = get_camera_stream_generator(1)
-
-    #fps, raw_stream = get_raw_stream_generator(VIDEO_PATH, loop=True)
-
-
-    print(f"Camera FPS: {fps}")
+    if url_source:
+        print("1. Initializing URL Source...")
+        fps, raw_stream = get_raw_stream_generator(VIDEO_URL, loop=True)
+    elif sample_source:
+        print("1. Initializing Sample Source...")
+        fps, raw_stream = get_raw_stream_generator(VIDEO_PATH, loop=True)
+    else: 
+        print("1. Initializing Camera Source...")
+        # Use device index 0 (or 1 if 0 is built-in webcam)
+        try:
+            fps, raw_stream = get_camera_stream_generator(0)
+        except ValueError:
+            print("Camera 0 failed, trying Camera 1...")
+            fps, raw_stream = get_camera_stream_generator(1)
 
     stream = reduce_framerate(raw_stream, fps, TARGET_FPS)
 
@@ -139,7 +81,8 @@ def main_modular(use_enhancement=False, invert_colors=False, use_emojis=True):
     stream = flip_stream_generator(stream, FLIP_CODE)
 
     print("3. Starting Setup Phase...")
-    tl_config = define_traffic_light(stream)
+    # This now returns a LIST of configs
+    tl_configs = define_traffic_light(stream)
 
     if use_enhancement:
         print("4. Optimizing Stream (Enhance Light)...")
@@ -150,15 +93,23 @@ def main_modular(use_enhancement=False, invert_colors=False, use_emojis=True):
     # --- Modular Pipeline ---
     
     # 1. Initialize State needed for modules
-    street_mask = None
-    street_pts = np.array(tl_config.get("street", []), np.int32)
-
-    w_crop = crop_rect[2] - crop_rect[0]
-    h_crop = crop_rect[3] - crop_rect[1]
+    street_masks = []
     
-    street_mask = np.zeros((h_crop, w_crop), dtype=np.uint8)
-    if len(street_pts) > 0:
-        cv2.fillPoly(street_mask, [street_pts], 255)
+    # Pre-calculate masks for each config
+    if crop_rect:
+        w_crop = crop_rect[2] - crop_rect[0]
+        h_crop = crop_rect[3] - crop_rect[1]
+    else:
+        from config import FULL_W, FULL_H
+        w_crop = FULL_W
+        h_crop = FULL_H
+
+    for config in tl_configs:
+        street_pts = np.array(config.get("street", []), np.int32)
+        mask = np.zeros((h_crop, w_crop), dtype=np.uint8)
+        if len(street_pts) > 0:
+            cv2.fillPoly(mask, [street_pts], 255)
+        street_masks.append(mask)
     
     # 2. Init AI & Tracker
     interpreter = tflite.Interpreter(model_path=MODEL_PATH, num_threads=4)
@@ -166,22 +117,24 @@ def main_modular(use_enhancement=False, invert_colors=False, use_emojis=True):
     tracker = CentroidTracker()
 
     # 3. Build Pipeline
+    
     # Stream -> Red Light Analysis
-    # stream data contains frame, status, status_color
-    stream_data = detect_redlight_stream(stream, tl_config)
+    # stream_data yields: (frame, results_list)
+    # results_list: [(status, color), ...]
+    stream_data = detect_redlight_stream(stream, tl_configs)
     
     # Red Light -> People Detection
-    # stream data contains frame, status, status_color, people
+    # stream_data yields: (frame, results_list, people)
     stream_data = detect_people_stream(stream_data, interpreter, tracker)
     
-    # Invert Colors (After analysis, before drawing)
+    # Invert Colors
     if invert_colors:
         from stream.optimize_stream import invert_stream_data_generator
         stream_data = invert_stream_data_generator(stream_data)
 
     # People -> Drawing
-    # Toggle emojis with a boolean (optional, hardcoded for now or parameterize)
-    stream = draw_objects_stream(stream_data, tl_config, street_mask, use_emojis=use_emojis)
+    # We pass the LISTs now
+    stream = draw_objects_stream(stream_data, tl_configs, street_masks, use_emojis=use_emojis)
     
     # 4. Display
     show_stream(stream, window_name="Modular Surveillance")
@@ -189,4 +142,4 @@ def main_modular(use_enhancement=False, invert_colors=False, use_emojis=True):
 if __name__ == "__main__":
     # Example usage:
     # main_modular(use_enhancement=True, invert_colors=True, use_emojis=True)
-    main_modular(use_enhancement=True, invert_colors=False, use_emojis=False)
+    main_modular(use_enhancement=False, invert_colors=False, use_emojis=False, sample_source=True, url_source=False)

@@ -1,17 +1,16 @@
 import cv2
-from plotting import draw_objects, draw_objects_emojis, draw_objects_image_emojis
+from plotting import draw_objects
 
 def draw_objects_stream(stream_data, config, street_mask, use_emojis=True):
     """
     Generator that draws objects on the frame.
-    Input: Stream of (frame, status, status_color, people)
+    Input: Stream of (frame, results_list, people)
     Yields: frame (modified)
     """
-    for frame, status, status_color, people in stream_data:
-        if use_emojis:
-            frame = draw_objects_image_emojis(status, status_color, people, config, frame, street_mask)
-        else:
-            frame = draw_objects(status, status_color, people, config, frame, street_mask)
+    for frame, results_list, people in stream_data:
+        # results_list = [(status, color), (status, color)...]
+        # We now use the unified orchestrator which handles the emoji flag
+        frame = draw_objects(results_list, people, config, frame, street_mask, use_emojis=use_emojis)
         yield frame
 
 def show_stream(stream, window_name="Modular Stream"):

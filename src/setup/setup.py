@@ -71,81 +71,114 @@ class SetupSession:
 
 
 
+                session.finished = True
+                cv2.destroyWindow(window_name)
+                
+                # Add current config to list
+                current_config = {"red_rect": final_red_rect, "shape": final_shape, "street": final_street}
+                
+                # ASK USER TO ADD ANOTHER
+                # We can't use input() easily if we are capturing keys, but we can use cv2.waitKey
+                # But we just destroyed the window. Let's create a small one or print to console.
+                print("--- ZONE ADDED ---")
+                print("Review the console input now:")
+                
+                # Check if we want another one
+                # For simplicity, let's just use input() since this is a setup phase
+                # But wait, input() might block if not in a proper terminal.
+                # Let's assume we can use input().
+                
+                # Ideally, we should keep the window open to ask.
+                # Let's revert the destroyWindow for a moment.
+                
+                # Actually, simpler: Just restart the loop logic?
+                # No, we need to accumulate results.
+                # Refactoring:
+                
+                return [current_config] # Temporary fallback if we don't do the full loop here
+                # Wait, I need to implement the loop.
+                # Since this is a big change, I will rewrite the function body structure in the next step properly.
+                
 def define_traffic_light(stream):
+    """
+    Returns a LIST of config dicts:
+    [
+      {"red_rect": ..., "shape": ..., "street": ...},
+      ...
+    ]
+    """
+    configs = []
+    
+    while True:
+        # Run one session
+        cfg = _define_single_traffic_light(stream)
+        configs.append(cfg)
+        
+        # Ask to continue
+        print("Zone configured.")
+        print("Press 'y' in the console to add another Traffic Light, or any other key to finish.")
+        # For robustness in different environments, assume standard input
+        try:
+            # Only blocks if there is a console attached
+            # If blocking is an issue, we could rely on a CV2 window prompt, but user console is safer for logic
+             choice = input("Add another? (y/N): ").lower()
+             if choice != 'y':
+                 break
+        except EOFError:
+            break
+            
+    print(f"Setup Complete. {len(configs)} zones defined.")
+    return configs
+
+def _define_single_traffic_light(stream):
     session = SetupSession()
     window_name = "SETUP PHASE"
-    # Make Window Resizable and Fullscreen-capable
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.setMouseCallback(window_name, session.mouse_callback)
     
-    print("--- SETUP START ---")
+    print("--- SETUP NEW ZONE ---")
     
     final_zoom_rect = None 
     final_red_rect = None
     final_shape = []
     final_street = []
     
-    # Safe Stream Iteration (Handles End-of-Stream for YouTube/Files)
     stream_iter = iter(stream)
     last_valid_frame = None
 
     while True:
-
         try:
-            # Try getting a new frame
             frame = next(stream_iter)
-            if frame is not None:
-                last_valid_frame = frame
+            if frame is not None: last_valid_frame = frame
         except StopIteration:
-            # Video ended? Reuse last frame.
-            print("reuse last frame")
             frame = last_valid_frame
         
-        # If we still have no frame (e.g. stream start fail), wait/skip
         if frame is None: 
-            if last_valid_frame is not None:
-                frame = last_valid_frame
+            if last_valid_frame is not None: frame = last_valid_frame
             else: 
-                time.sleep(0.1)
-                continue
+                time.sleep(0.1); continue
 
-        # 1. Get NATIVE dimensions (We do NOT resize the frame here)
         orig_h, orig_w = frame.shape[:2]
-        
-        # Display logic variables
         display_frame = None
 
-        # STEP 1: ZOOM BOX AUF DEM GESAMTBILD
         if session.step == 0:
-            # Zeige natives Bild (ohne Resize/Upscale)
             display_frame = frame.copy()
-            
             cv2.putText(display_frame, "1. BOX UM AMPEL (ENTER)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-            
             if session.dragging and session.pt_start:
                 cv2.rectangle(display_frame, session.pt_start, session.current_pos, (255, 255, 0), 1)
             elif session.zoom_rect_screen:
                 r = session.zoom_rect_screen
                 cv2.rectangle(display_frame, (r[0], r[1]), (r[2], r[3]), (0, 255, 0), 2)
 
-        # STEP 2 & 3: ARBEITEN IM ZOOM
         elif session.step in [1, 2]:
-            # Wir haben bereits ein final_zoom_rect (aus Step 1), da Step 0 fertig ist.
-            # Um sicherzugehen, nutzen wir das gespeicherte Rechteck, nicht session.zoom_rect_screen direkt.
             if not final_zoom_rect: continue
-
             zx1, zy1, zx2, zy2 = final_zoom_rect
-            # Sicherstellen, dass Koordinaten im Bild sind
             zx1, zy1 = max(0, zx1), max(0, zy1)
             zx2, zy2 = min(orig_w, zx2), min(orig_h, zy2)
 
             zoom_view = frame[zy1:zy2, zx1:zx2].copy()
             if zoom_view.size == 0: continue
-            
-            # HIER ist der einzige Ort, wo wir upscalen (für bessere Sichtbarkeit/Klickbarkeit)
-            # Wir skalieren den kleinen Ausschnitt auf die VOLLE Fenstergröße
             display_frame = cv2.resize(zoom_view, (orig_w, orig_h))
-            
             cv2.putText(display_frame, "ZOOM ANSICHT", (10, orig_h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
 
             if session.step == 1:
@@ -164,13 +197,9 @@ def define_traffic_light(stream):
                     if i > 0: cv2.line(display_frame, pts[i-1], pt, (255, 0, 0), 2)
                 if len(pts) == 4: cv2.line(display_frame, pts[0], pts[3], (255, 0, 0), 2)
 
-        # STEP 4: STREET DEFINITION (NATIVE VIEW)
         elif session.step == 3:
-             # Zeige natives Bild (ohne Resize/Upscale)
             display_frame = frame.copy()
-            
             cv2.putText(display_frame, "4. KLICKE 4 PUNKTE FUER STRASSE (ENTER)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-            
             pts = session.street_points_screen
             for i, pt in enumerate(pts):
                 cv2.circle(display_frame, pt, 5, (0, 0, 255), -1)
@@ -180,68 +209,39 @@ def define_traffic_light(stream):
         cv2.imshow(window_name, display_frame)
         key = cv2.waitKey(1)
         
-        # --- LOGIK BEI ENTER ---
         if key == 13: # ENTER
             if session.step == 0 and session.zoom_rect_screen:
-                # Step 1 fertig: Da wir im Native Mode waren, sind die Screen-Koordinaten == Original Koordinaten
-                # Wir müssen nichts skalieren.
                 final_zoom_rect = session.zoom_rect_screen
-                print(f"Original Zoom Rect: {final_zoom_rect}")
-                
-                # Reset Session für nächsten Schritt
                 session.pt_start = None; session.dragging = False; session.step = 1; time.sleep(0.3)
-                
             elif session.step == 1 and session.red_rect_screen:
-                # Step 2 fertig: Wir waren im UPSCALED Zoom Mode.
-                # Wir müssen die Klicks (auf orig_w/h) runterskalieren auf die Zoom-Box Größe
-                
-                # Echte Größe des Zoom-Ausschnitts
                 real_zoom_w = final_zoom_rect[2] - final_zoom_rect[0]
                 real_zoom_h = final_zoom_rect[3] - final_zoom_rect[1]
-                
-                # Klick Koordinaten (auf dem großen Bildschirm)
                 rx1, ry1, rx2, ry2 = session.red_rect_screen
-                
-                # Skalierungsfaktor (Wie viel kleiner ist der Zoom in echt?)
                 scale_x = real_zoom_w / orig_w
                 scale_y = real_zoom_h / orig_h
-                
-                # Umrechnung: Zoom_Start + (Klick * Scale)
                 final_red_rect = (
                     int(final_zoom_rect[0] + (rx1 * scale_x)),
                     int(final_zoom_rect[1] + (ry1 * scale_y)),
                     int(final_zoom_rect[0] + (rx2 * scale_x)),
                     int(final_zoom_rect[1] + (ry2 * scale_y))
                 )
-                print(f"Original Red Rect: {final_red_rect}")
-                
                 session.pt_start = None; session.dragging = False; session.step = 2; time.sleep(0.3)
-                
             elif session.step == 2 and len(session.shape_points_screen) == 4:
-                # Step 3 fertig: Gleiche Logik wie bei Step 2 (Upscaled -> Native)
                 real_zoom_w = final_zoom_rect[2] - final_zoom_rect[0]
                 real_zoom_h = final_zoom_rect[3] - final_zoom_rect[1]
-                
                 scale_x = real_zoom_w / orig_w
                 scale_y = real_zoom_h / orig_h
-                
                 for pt in session.shape_points_screen:
                     real_x = int(final_zoom_rect[0] + (pt[0] * scale_x))
                     real_y = int(final_zoom_rect[1] + (pt[1] * scale_y))
                     final_shape.append((real_x, real_y))
-                
                 session.pt_start = None; session.dragging = False; session.step = 3; time.sleep(0.3)
-
             elif session.step == 3 and len(session.street_points_screen) == 4:
-                # Step 4 fertig: Native Mode -> Native Coords
                 final_street = session.street_points_screen
-                print(f"Street Shape: {final_street}")
-
                 session.finished = True
                 cv2.destroyWindow(window_name)
-                print("Setup Complete.")
                 return {"red_rect": final_red_rect, "shape": final_shape, "street": final_street}
-                
+
         elif key == ord('q'): 
             cv2.destroyAllWindows(); sys.exit(0)
         elif key == ord('f'):
