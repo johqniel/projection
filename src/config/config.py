@@ -9,14 +9,14 @@ NMS_THRESHOLD = 0.4 # Threshold for removing overlapping boxes in YOLO
 
 
 # --- VIDEO INPUT CONFIG ---
-VIDEO_PATH = "/Users/nielo/Desktop/projection/samples/P.mov"
+VIDEO_PATH = "/Users/nielo/Desktop/projection/samples/M.mov"
 VIDEO_URL = "https://www.youtube.com/watch?v=S1A49C6V-dg" # Falls URL gewünscht
 
-
+# h%y#bs+=u1-rivnAs-d@zwut
 
 # Config for people detection
 PERSON_CLASS_ID = 0
-THRESHOLD = 0.7 
+THRESHOLD = 0.4 
 
 # Tracker Config
 TRACKER_MAX_DISAPPEARED = 20

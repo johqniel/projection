@@ -76,7 +76,7 @@ def get_standard_tflite_outputs(interpreter, frame):
     }
 
 
-def get_yolo_tflite_outputs(interpreter, frame):
+def get_yolo_tflite_outputs(interpreter, frame, conf_threshold=THRESHOLD):
     """
     Handles YOLO style models with Vectorized Processing.
     Fixes 'Slowness' by removing Python loops.
@@ -85,6 +85,7 @@ def get_yolo_tflite_outputs(interpreter, frame):
     Args:
         interpreter: The TFLite interpreter instance.
         frame (np.ndarray): The input frame (unused here, but kept for function signature consistency).
+        conf_threshold (float): Confidence threshold for filtering. Defaults to config.THRESHOLD.
 
     Returns:
         dict: A dictionary containing 'boxes' (normalized [ymin, xmin, ymax, xmax]),
@@ -129,7 +130,7 @@ def get_yolo_tflite_outputs(interpreter, frame):
 
     # --- 2. Vectorized Filtering (Replaces Slow Loop) ---
     # Create a boolean mask for everything above threshold
-    mask = final_scores > THRESHOLD
+    mask = final_scores > conf_threshold
     
     # If nothing detected, return early
     if not np.any(mask):
@@ -166,7 +167,7 @@ def get_yolo_tflite_outputs(interpreter, frame):
     indices = cv2.dnn.NMSBoxes(
         boxes_for_nms.tolist(), 
         det_scores.tolist(), 
-        THRESHOLD, 
+        conf_threshold, 
         NMS_THRESHOLD
     )
     

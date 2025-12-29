@@ -10,8 +10,8 @@ def draw_objects_stream(stream_data, config, street_mask, use_emojis=True):
     for frame, results_list, people in stream_data:
         # results_list = [(status, color), (status, color)...]
         # We now use the unified orchestrator which handles the emoji flag
-        frame = draw_objects(results_list, people, config, frame, street_mask, use_emojis=use_emojis)
-        yield frame
+        frame, is_jaywalking = draw_objects(results_list, people, config, frame, street_mask, use_emojis=use_emojis)
+        yield frame, is_jaywalking
 
 def show_stream(stream, window_name="Modular Stream"):
     """

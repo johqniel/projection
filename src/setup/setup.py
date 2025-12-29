@@ -3,6 +3,7 @@
 import cv2
 import time
 import sys
+import numpy as np
 
 
 # --- HELPER: SETUP SESSION (MOUSE LOGIC) ---
@@ -71,33 +72,6 @@ class SetupSession:
 
 
 
-                session.finished = True
-                cv2.destroyWindow(window_name)
-                
-                # Add current config to list
-                current_config = {"red_rect": final_red_rect, "shape": final_shape, "street": final_street}
-                
-                # ASK USER TO ADD ANOTHER
-                # We can't use input() easily if we are capturing keys, but we can use cv2.waitKey
-                # But we just destroyed the window. Let's create a small one or print to console.
-                print("--- ZONE ADDED ---")
-                print("Review the console input now:")
-                
-                # Check if we want another one
-                # For simplicity, let's just use input() since this is a setup phase
-                # But wait, input() might block if not in a proper terminal.
-                # Let's assume we can use input().
-                
-                # Ideally, we should keep the window open to ask.
-                # Let's revert the destroyWindow for a moment.
-                
-                # Actually, simpler: Just restart the loop logic?
-                # No, we need to accumulate results.
-                # Refactoring:
-                
-                return [current_config] # Temporary fallback if we don't do the full loop here
-                # Wait, I need to implement the loop.
-                # Since this is a big change, I will rewrite the function body structure in the next step properly.
                 
 def define_traffic_light(stream):
     """
@@ -114,21 +88,40 @@ def define_traffic_light(stream):
         cfg = _define_single_traffic_light(stream)
         configs.append(cfg)
         
-        # Ask to continue
-        print("Zone configured.")
-        print("Press 'y' in the console to add another Traffic Light, or any other key to finish.")
-        # For robustness in different environments, assume standard input
-        try:
-            # Only blocks if there is a console attached
-            # If blocking is an issue, we could rely on a CV2 window prompt, but user console is safer for logic
-             choice = input("Add another? (y/N): ").lower()
-             if choice != 'y':
-                 break
-        except EOFError:
+        # Ask to continue using GUI (Console input is blocking and often invisible)
+        if not _ask_to_continue():
             break
             
     print(f"Setup Complete. {len(configs)} zones defined.")
     return configs
+
+def _ask_to_continue():
+    """
+    Shows a window asking user to continue or not.
+    Returns True if 'y', False otherwise.
+    """
+    window_name = "Continue?"
+    img = np.zeros((300, 600, 3), dtype=np.uint8)
+    
+    cv2.putText(img, "Add another Traffic Light?", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    cv2.putText(img, "y = YES, n = NO", (150, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    
+    cv2.imshow(window_name, img)
+    
+    print("Waiting for user response (y/n) in 'Continue?' window...")
+    
+    res = False
+    while True:
+        key = cv2.waitKey(0)
+        if key == ord('y'):
+            res = True
+            break
+        elif key == ord('n') or key == 27: # ESC or n
+            res = False
+            break
+            
+    cv2.destroyWindow(window_name)
+    return res
 
 def _define_single_traffic_light(stream):
     session = SetupSession()

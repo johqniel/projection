@@ -2,3 +2,13 @@ numpy
 opencv-python
 yt-dlp
 tensorflow
+moviepy
+mediapipe
+torch
+torchvision
+pandas
+requests
+PyYAML
+tqdm
+seaborn
+vidgear

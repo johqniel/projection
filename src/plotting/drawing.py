@@ -277,4 +277,4 @@ def draw_objects(results_list, objects, config_list, frame, street_masks, use_em
     if use_emojis:
         draw_emojis(frame, use_image=True)
 
-    return frame
+    return frame, len(red_p) > 0

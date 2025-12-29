@@ -1,6 +1,6 @@
 
-import yt_dlp 
 import cv2
+from vidgear.gears import CamGear
 
 from config import FULL_H, FULL_W, CROP_H, CROP_W
 
@@ -19,15 +19,15 @@ Key Functions:
 Dependencies:
 - `config.py`: specific constants (e.g., FULL_H, FULL_W, CROP_H, CROP_W).
 - `cv2` (OpenCV): for video capture and frame processing.
-- `yt_dlp`: for downloading video streams from URLs.
+- `vidgear`: for threaded, high-performance streaming.
 """
 
 def get_raw_stream_generator(source_path, loop=True):
     """
-    Creates a generator that yields frames from a file or URL using OpenCV.
+    Creates a generator that yields frames from a file or URL using OpenCV or VidGear.
 
     If the source path starts with "http", it is treated as a URL and processed
-    via yt_dlp to extract the best video stream URL.
+    via vidgear.gears.CamGear for high-performance threaded streaming.
 
     Args:
         source_path (str | int): The path to the video file or the URL of the stream.
@@ -38,18 +38,41 @@ def get_raw_stream_generator(source_path, loop=True):
         tuple: A tuple containing (fps (float), generator (typing.Generator)).
                The generator yields frames (np.ndarray).
     """
-    # 1. Handle URL
-    if str(source_path).startswith("http"):
-        print(f"⏳ Extracting URL: {source_path}")
-        ydl_opts = {'format': 'bestvideo/best', 'quiet': True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(source_path, download=False)
-            source_path = info['url']
-        loop = False # Livestreams don't loop
-        cap = cv2.VideoCapture(source_path)
+    fps = 30.0 # Default value, will be updated if possible
 
-    else:
-        cap = cv2.VideoCapture(source_path)
+    # 1. Handle URL with VidGear
+    if str(source_path).startswith("http"):
+        print(f"⏳ Initializing VidGear stream for URL: {source_path}")
+        
+        # STREAM_RESOLUTION ensures we get best quality (or specified), threaded.
+        # logging=True helps debug if there are issues.
+        options = {"STREAM_RESOLUTION": "best", "CAP_PROP_FRAME_WIDTH":1920, "CAP_PROP_FRAME_HEIGHT":1080} 
+        
+        try:
+            stream = CamGear(source=source_path, stream_mode=True, logging=True, **options).start()
+            fps = stream.framerate if stream.framerate > 0 else 30.0
+            loop = False # Livestreams don't loop
+            
+            print(f"VidGear Stream Started. FPS: {fps}")
+            
+            def generator():
+                 while True:
+                    frame = stream.read()
+                    if frame is None:
+                        print("VidGear stream ended or failed to read frame.")
+                        break
+                    yield frame
+                 stream.stop()
+                 
+            return fps, generator()
+
+        except Exception as e:
+            print(f"VidGear failed: {e}. Falling back to standard method...")
+            # Fallthrough to standard CV2 if vidgear fails for some reason (unlikely for youtube)
+            pass
+
+    # 2. Standard OpenCV (File or Fallback)
+    cap = cv2.VideoCapture(source_path)
     
     if not cap.isOpened():
         raise ValueError(f"Could not open video source: {source_path}")
@@ -58,14 +81,21 @@ def get_raw_stream_generator(source_path, loop=True):
     print(f"Input FPS: {fps}")
 
     def generator():
+        frames_read = 0
         while True:
             ret, frame = cap.read()
             if not ret:
                 if loop:
+                    if frames_read == 0:
+                         print("Error: Could not read any frames from source, even though opened successfully.")
+                         break
+                    
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                     continue
                 else:
                     break # End of stream
+            
+            frames_read += 1
             yield frame
         cap.release()
     
